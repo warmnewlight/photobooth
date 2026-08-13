@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Daniel & Alicia's Photo Booth</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #1a1a1a;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    #camera-container {
+      position: relative;
+      width: 100%;
+      max-width: 500px; /* Limits size on tablets/laptops */
+      aspect-ratio: 3/4; /* Standard phone portrait ratio */
+      background: #000;
+      overflow: hidden;
+    }
+
+    /* The video feed is mirrored so it acts like a real mirror for selfies */
+    #video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none; /* Lets you tap through the frame if needed */
+      z-index: 10;
+    }
+
+    #photo-preview {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 20;
+    }
+
+    #controls {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    button, .btn {
+      background-color: #ffffff;
+      color: #000000;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+    }
+
+    button:active, .btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="camera-container">
+    <!-- playsinline is crucial so iPhones don't force fullscreen video -->
+    <video id="video" autoplay playsinline></video>
+    <img id="frame" src="frame.png" alt="Wedding Frame" />
+    <img id="photo-preview" alt="Captured Photo" />
+    <canvas id="canvas" style="display:none;"></canvas>
+  </div>
+
+  <div id="controls">
+    <button id="snap-btn">Snap Photo</button>
+    <button id="retake-btn" style="display:none;">Retake</button>
+    <a id="download-btn" class="btn" style="display:none;" download="wedding_photo.png">Save Photo</a>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const frame = document.getElementById('frame');
+    const snapBtn = document.getElementById('snap-btn');
+    const retakeBtn = document.getElementById('retake-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const photoPreview = document.getElementById('photo-preview');
+
+    // 1. Request access to the front-facing camera
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" }, // Forces front camera on mobile
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("Please allow camera access to use the photo booth!");
+        console.error("Camera error:", err);
+      }
+    }
+
+    // 2. Take the photo and merge the video + frame
+    snapBtn.addEventListener('click', () => {
+      // Set canvas to match the actual video resolution, not the CSS size
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+
+      // Mirror the context so the saved photo matches what they saw on screen
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      
+      // Draw the video frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Reset the mirror effect BEFORE drawing the frame so the text isn't backwards
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      // Draw the transparent PNG frame on top
+      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+
+      // Convert the canvas to an actual image file
+      const dataUrl = canvas.toDataURL('image/png');
+      photoPreview.src = dataUrl;
+      downloadBtn.href = dataUrl;
+
+      // Update the interface
+      video.style.display = 'none';
+      frame.style.display = 'none';
+      photoPreview.style.display = 'block';
+      
+      snapBtn.style.display = 'none';
+      retakeBtn.style.display = 'block';
+      downloadBtn.style.display = 'block';
+    });
+
+    // 3. Reset everything for another photo
+    retakeBtn.addEventListener('click', () => {
+      video.style.display = 'block';
+      frame.style.display = 'block';
+      photoPreview.style.display = 'none';
+
+      snapBtn.style.display = 'block';
+      retakeBtn.style.display = 'none';
+      downloadBtn.style.display = 'none';
+    });
+
+    // Start the camera immediately when the page loads
+    startCamera();
+  </script>
+</body>
+</html>

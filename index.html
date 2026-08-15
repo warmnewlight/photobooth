@@ -133,8 +133,11 @@
     const downloadBtn = document.getElementById('download-btn');
     const photoPreview = document.getElementById('photo-preview');
 
-    let useFrontCamera = true;
     let currentStream = null;
+    
+    // Arrays to hold all available lenses and our current position
+    let videoDevices = [];
+    let currentDeviceIndex = 0;
 
     // --- NEW: Frame Selection Logic ---
     // List all your frame filenames here. You can add as many as you want!
@@ -142,20 +145,40 @@
     let currentFrameIndex = 0;
 
     changeFrameBtn.addEventListener('click', () => {
-      // Move to the next frame, and loop back to 0 if at the end of the list
       currentFrameIndex = (currentFrameIndex + 1) % frames.length;
       frameElement.src = frames[currentFrameIndex];
     });
-    // ----------------------------------
 
-    // 1. Request access to the camera and handle switching
-    async function startCamera() {
+    // 1. Find all cameras on the phone
+    async function getCameras() {
+      try {
+        // We must request basic camera access first, otherwise the browser hides the device names for privacy
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // Ask the phone to list every piece of media hardware it has
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        
+        // Filter out microphones and speakers, keeping only the camera lenses
+        videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        // Start the camera with the first lens in the list
+        if (videoDevices.length > 0) {
+          startCamera(videoDevices[currentDeviceIndex].deviceId);
+        }
+      } catch (err) {
+        alert("Camera access is required to use the photo booth!");
+        console.error("Device enumeration error:", err);
+      }
+    }
+
+    // 2. Start a specific camera using its exact hardware ID
+    async function startCamera(deviceId) {
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
       }
 
       const constraints = {
-        video: { facingMode: useFrontCamera ? "user" : "environment" },
+        video: { deviceId: { exact: deviceId } },
         audio: false
       };
 
@@ -163,30 +186,40 @@
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
         
-        if (useFrontCamera) {
+        // Check if the currently selected lens is a front-facing selfie camera
+        // so we can mirror it properly. (Usually, the label contains 'front' or 'user')
+        const currentDevice = videoDevices[currentDeviceIndex];
+        const isFrontCamera = currentDevice.label.toLowerCase().includes('front');
+        
+        if (isFrontCamera) {
           video.style.transform = "scaleX(-1)";
         } else {
           video.style.transform = "scaleX(1)";
         }
       } catch (err) {
-        alert("Unable to switch cameras. Please check permissions.");
-        console.error("Camera error:", err);
+        console.error("Camera start error:", err);
       }
     }
 
-    // 2. Flip Camera button listener
+    // 3. Cycle to the next available lens when the button is clicked
     flipBtn.addEventListener('click', () => {
-      useFrontCamera = !useFrontCamera;
-      startCamera();
+      if (videoDevices.length > 1) {
+        currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+        startCamera(videoDevices[currentDeviceIndex].deviceId);
+      }
     });
 
-    // 3. Take the photo and merge the video + frame
+    // 4. Take the photo
     snapBtn.addEventListener('click', () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
 
-      if (useFrontCamera) {
+      const currentDevice = videoDevices[currentDeviceIndex];
+      const isFrontCamera = currentDevice.label.toLowerCase().includes('front');
+
+      // Mirror the saved photo if it's a selfie camera
+      if (isFrontCamera) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
       } else {
@@ -195,15 +228,12 @@
       
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      
-      // Draws whichever frame is currently selected
       ctx.drawImage(frameElement, 0, 0, canvas.width, canvas.height);
 
       const dataUrl = canvas.toDataURL('image/png');
       photoPreview.src = dataUrl;
       downloadBtn.href = dataUrl;
 
-      // Update the interface
       video.style.display = 'none';
       frameElement.style.display = 'none';
       photoPreview.style.display = 'block';
@@ -215,7 +245,7 @@
       downloadBtn.style.display = 'block';
     });
 
-    // 4. Reset everything for another photo
+    // 5. Reset for another photo
     retakeBtn.addEventListener('click', () => {
       video.style.display = 'block';
       frameElement.style.display = 'block';
@@ -228,8 +258,8 @@
       downloadBtn.style.display = 'none';
     });
 
-    // Start the camera immediately when the page loads
-    startCamera();
+    // Kick off the whole process by finding the cameras when the page loads
+    getCameras();    // Start the camera immediately when the page loads
   </script>
 </body>
 </html>

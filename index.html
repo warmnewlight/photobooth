@@ -237,28 +237,47 @@
       return new File([u8arr], filename, {type:mime});
     }
 
-    // New Save/Share button logic
+    // Helper function to convert the canvas data into a real file (Needed for iOS sharing)
+    function dataURLtoFile(dataurl, filename) {
+      let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+          bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+      while(n--){
+          u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, {type:mime});
+    }
+
+    // New Hybrid Save Logic
     downloadBtn.addEventListener('click', async () => {
       const dataUrl = canvas.toDataURL('image/png');
-      const file = dataURLtoFile(dataUrl, 'DA_Wedding_Photo.png');
+      
+      // Check if the device is Android
+      const isAndroid = /Android/i.test(navigator.userAgent);
 
-      // Check if the phone supports the native share menu (iOS Safari and Android Chrome do)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: 'Daniel & Alicia Photo Booth',
-            text: 'Our photo from Daniel & Alicia\'s Wedding!'
-          });
-        } catch (err) {
-          console.log('Share canceled or failed', err);
-        }
-      } else {
-        // Fallback for desktops or browsers that don't support the Share API
+      if (isAndroid) {
+        // ANDROID BEHAVIOR: Instant direct download
         const link = document.createElement('a');
         link.download = 'DA_Wedding_Photo.png';
         link.href = dataUrl;
         link.click();
+      } else {
+        // APPLE/OTHER BEHAVIOR: Trigger the native Share Sheet so it goes to the Camera Roll
+        const file = dataURLtoFile(dataUrl, 'DA_Wedding_Photo.png');
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Daniel & Alicia Photo Booth',
+              text: 'Our photo from Daniel & Alicia\'s Wedding!'
+            });
+          } catch (err) {
+            console.log('Share canceled or failed', err);
+          }
+        } else {
+          // Fallback if sharing is unavailable
+          alert("To save: Tap and hold the photo, then select 'Save to Photos'.");
+        }
       }
     });
     // Start the camera immediately when the page loads

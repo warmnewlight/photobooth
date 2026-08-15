@@ -119,7 +119,7 @@
     <button id="snap-btn">Snap Photo</button>
     
     <button id="retake-btn" style="display:none;">Retake</button>
-    <a id="download-btn" class="btn" style="display:none;" download="wedding_photo.png">Save Photo</a>
+    <button id="download-btn" style="display:none;">Save/Share Photo</button>
   </div>
 
   <script>
@@ -227,7 +227,40 @@
       retakeBtn.style.display = 'none';
       downloadBtn.style.display = 'none';
     });
+// Helper function to convert the canvas data into a real file
+    function dataURLtoFile(dataurl, filename) {
+      let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+          bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+      while(n--){
+          u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, {type:mime});
+    }
 
+    // New Save/Share button logic
+    downloadBtn.addEventListener('click', async () => {
+      const dataUrl = canvas.toDataURL('image/png');
+      const file = dataURLtoFile(dataUrl, 'DA_Wedding_Photo.png');
+
+      // Check if the phone supports the native share menu (iOS Safari and Android Chrome do)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Daniel & Alicia Photo Booth',
+            text: 'Our photo from Daniel & Alicia\'s Wedding!'
+          });
+        } catch (err) {
+          console.log('Share canceled or failed', err);
+        }
+      } else {
+        // Fallback for desktops or browsers that don't support the Share API
+        const link = document.createElement('a');
+        link.download = 'DA_Wedding_Photo.png';
+        link.href = dataUrl;
+        link.click();
+      }
+    });
     // Start the camera immediately when the page loads
     startCamera();
   </script>

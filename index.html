@@ -22,7 +22,7 @@
       position: relative;
       width: 100%;
       max-width: 500px;
-      aspect-ratio: 3/4;
+      aspect-ratio: 4/5;
       background: #000;
       overflow: hidden;
     }
@@ -34,7 +34,6 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      /* The transform scaleX is now handled dynamically in JavaScript */
     }
 
     #frame {
@@ -63,30 +62,40 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 15px;
+      gap: 10px;
       margin-top: 20px;
       padding: 0 15px 20px;
+      width: 100%;
+      max-width: 500px;
     }
 
     button, .btn {
       background-color: #ffffff;
       color: #000000;
       border: none;
-      padding: 15px 25px;
+      padding: 15px 20px;
       border-radius: 30px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       cursor: pointer;
       text-decoration: none;
       text-align: center;
       flex-grow: 1;
-      max-width: 200px;
+      max-width: 48%;
     }
 
-    /* Distinct styling for the flip button */
-    #flip-btn {
+    /* Distinct styling for the secondary buttons */
+    #flip-btn, #change-frame-btn {
       background-color: #444444;
       color: white;
+    }
+
+    /* Make the snap button span full width for emphasis */
+    #snap-btn {
+      max-width: 100%;
+      flex-basis: 100%;
+      padding: 18px 20px;
+      background-color: #ffffff;
     }
 
     button:active, .btn:active {
@@ -98,14 +107,17 @@
 
   <div id="camera-container">
     <video id="video" autoplay playsinline></video>
-    <img id="frame" src="frame.png" alt="Wedding Frame" />
+    <!-- Starts with frame1.png by default -->
+    <img id="frame" src="frame1.png" alt="Wedding Frame" />
     <img id="photo-preview" alt="Captured Photo" />
     <canvas id="canvas" style="display:none;"></canvas>
   </div>
 
   <div id="controls">
     <button id="flip-btn">Flip Camera</button>
+    <button id="change-frame-btn">Change Frame</button>
     <button id="snap-btn">Snap Photo</button>
+    
     <button id="retake-btn" style="display:none;">Retake</button>
     <a id="download-btn" class="btn" style="display:none;" download="wedding_photo.png">Save Photo</a>
   </div>
@@ -113,9 +125,10 @@
   <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const frame = document.getElementById('frame');
+    const frameElement = document.getElementById('frame');
     const snapBtn = document.getElementById('snap-btn');
     const flipBtn = document.getElementById('flip-btn');
+    const changeFrameBtn = document.getElementById('change-frame-btn');
     const retakeBtn = document.getElementById('retake-btn');
     const downloadBtn = document.getElementById('download-btn');
     const photoPreview = document.getElementById('photo-preview');
@@ -123,9 +136,20 @@
     let useFrontCamera = true;
     let currentStream = null;
 
+    // --- NEW: Frame Selection Logic ---
+    // List all your frame filenames here. You can add as many as you want!
+    const frames = ['frame1.png', 'frame2.png', 'frame3.png'];
+    let currentFrameIndex = 0;
+
+    changeFrameBtn.addEventListener('click', () => {
+      // Move to the next frame, and loop back to 0 if at the end of the list
+      currentFrameIndex = (currentFrameIndex + 1) % frames.length;
+      frameElement.src = frames[currentFrameIndex];
+    });
+    // ----------------------------------
+
     // 1. Request access to the camera and handle switching
     async function startCamera() {
-      // Stop the existing camera stream before switching
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
       }
@@ -139,7 +163,6 @@
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
         
-        // Mirror the live video feed ONLY if using the front selfie camera
         if (useFrontCamera) {
           video.style.transform = "scaleX(-1)";
         } else {
@@ -163,7 +186,6 @@
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
 
-      // Apply mirroring to the final saved image ONLY if using the front camera
       if (useFrontCamera) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
@@ -171,14 +193,11 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0);
       }
       
-      // Draw the video frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Reset the mirror effect BEFORE drawing the transparent frame
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-      // Draw the transparent PNG frame on top
-      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+      
+      // Draws whichever frame is currently selected
+      ctx.drawImage(frameElement, 0, 0, canvas.width, canvas.height);
 
       const dataUrl = canvas.toDataURL('image/png');
       photoPreview.src = dataUrl;
@@ -186,11 +205,12 @@
 
       // Update the interface
       video.style.display = 'none';
-      frame.style.display = 'none';
+      frameElement.style.display = 'none';
       photoPreview.style.display = 'block';
       
       snapBtn.style.display = 'none';
       flipBtn.style.display = 'none';
+      changeFrameBtn.style.display = 'none';
       retakeBtn.style.display = 'block';
       downloadBtn.style.display = 'block';
     });
@@ -198,11 +218,12 @@
     // 4. Reset everything for another photo
     retakeBtn.addEventListener('click', () => {
       video.style.display = 'block';
-      frame.style.display = 'block';
+      frameElement.style.display = 'block';
       photoPreview.style.display = 'none';
 
       snapBtn.style.display = 'block';
       flipBtn.style.display = 'block';
+      changeFrameBtn.style.display = 'block';
       retakeBtn.style.display = 'none';
       downloadBtn.style.display = 'none';
     });

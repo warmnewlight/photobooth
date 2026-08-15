@@ -154,8 +154,13 @@
         currentStream.getTracks().forEach(track => track.stop());
       }
 
+      // Tell the browser we want the highest resolution possible
       const constraints = {
-        video: { facingMode: useFrontCamera ? "user" : "environment" },
+        video: { 
+          facingMode: useFrontCamera ? "user" : "environment",
+          width: { ideal: 4096 },
+          height: { ideal: 2160 }
+        },
         audio: false
       };
 
